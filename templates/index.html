@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>检测到的文件</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .file-list { list-style-type: none; padding: 0; }
+        .file-item { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <h1>检测到的文件</h1>
+    <button id="startDetection">开始检测</button>
+    <ul id="fileList" class="file-list">
+    {% for file in files %}
+        <li class="file-item">
+            <strong>{{ file.name }}</strong>
+            {% if file.type == '.mp4' %}
+                <video width="320" height="240" controls>
+                    <source src="{{ url_for('download_file', filename=file.path) }}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            {% elif file.type in ['.pdf', '.doc', '.docx'] %}
+                <a href="{{ url_for('download_file', filename=file.path) }}" target="_blank">查看文档</a>
+            {% endif %}
+        </li>
+    {% endfor %}
+    </ul>
+    <script>
+        document.getElementById('startDetection').addEventListener('click', function() {
+            fetch('/start_detection')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === "started") {
+                        console.log("检测已开始");
+                        setTimeout(checkNewFiles, 5000);  // 5秒后检查新文件
+                    }
+                });
+        });
+
+        function checkNewFiles() {
+            fetch('/get_new_files')
+                .then(response => response.json())
+                .then(files => {
+                    const fileList = document.getElementById('fileList');
+                    const currentFiles = fileList.children.length;
+                    if (files.length > currentFiles) {
+                        for (let i = currentFiles; i < files.length; i++) {
+                            const file = files[i];
+                            const li = document.createElement('li');
+                            li.className = 'file-item';
+                            li.innerHTML = `<strong>${file.name}</strong>`;
+                            if (file.type === '.mp4') {
+                                li.innerHTML += `
+                                    <video width="320" height="240" controls>
+                                        <source src="/uploads/${file.path}" type="video/mp4">
+                                        Your browser does not support the video tag.
+                                    </video>
+                                `;
+                            } else if (['.pdf', '.doc', '.docx'].includes(file.type)) {
+                                li.innerHTML += `
+                                    <a href="/uploads/${file.path}" target="_blank">查看文档</a>
+                                `;
+                            }
+                            fileList.appendChild(li);
+                        }
+                    }
+                });
+        }
+    </script>
+</body>
+</html>
