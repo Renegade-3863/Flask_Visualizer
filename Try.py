@@ -29,7 +29,7 @@ class MyHandler(FileSystemEventHandler):
             file_name = os.path.basename(file_path)
             _, file_extension = os.path.splitext(file_name)
             
-            if file_extension.lower() in ['.mp4', '.pdf', '.doc', '.docx']:
+            if file_extension.lower() in ['.mp4', '.pdf', '.doc', '.docx', '.txt']:
                 print(f"File {file_path} has been created")
                 new_file = {
                     'name': file_name,
@@ -110,6 +110,23 @@ def delete_file():
             detected_files = [f for f in detected_files if f['path'] != file_path]
             return jsonify({"status": "success", "message": "文件已删除"})
     return jsonify({"status": "error", "message": "文件删除失败"}), 400
+
+@app.route('/read_text_file/<path:filename>')
+def read_text_file(filename):
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            content = file.read()
+        return jsonify({"content": content})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/pause_observation', methods=['POST'])
+def pause_observation():
+    global detection_active
+    observer_event.clear()
+    detection_active = False
+    return jsonify({"status": "paused", "message": "观察已手动暂停"})
 
 if __name__ == '__main__':
     # 在单独的线程中启动文件系统观察者

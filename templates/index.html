@@ -7,6 +7,7 @@
 <body>
     <h1>检测到的文件</h1>
     <button id="resumeDetection">继续检测</button>
+    <button id="pauseObservation">暂停检测</button>
     <ul id="fileList" class="file-list">
         <!-- 文件列表将通过 JavaScript 动态更新 -->
     </ul>
@@ -22,6 +23,7 @@
             const strong = document.createElement('strong');
             strong.textContent = file.name;
             li.appendChild(strong);
+            console.log('File type:', file.type);
 
             if (file.type === '.mp4') {
                 const video = document.createElement('video');
@@ -41,8 +43,34 @@
                 a.target = '_blank';
                 a.textContent = '查看文档';
                 li.appendChild(a);
+            } else if (file.type === '.txt') {
+                const button = document.createElement('button');
+                button.textContent = '查看文本内容';
+                button.onclick = function() {
+                    axios.get(`/read_text_file/${file.path}`)
+                        .then(response => {
+                            const content = response.data.content;
+                            const textArea = document.createElement('textarea');
+                            textArea.value = content;
+                            textArea.rows = 10;
+                            textArea.cols = 50;
+                            textArea.readOnly = true;
+                    
+                            // 如果已经存在文本区域，就替换它
+                            const existingTextArea = li.querySelector('textarea');
+                            if (existingTextArea) {
+                                li.replaceChild(textArea, existingTextArea);
+                            } else {
+                                li.appendChild(textArea);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error reading text file:', error);
+                            alert('读取文本文件失败');
+                        });
+                };
+                li.appendChild(button);
             }
-
             const deleteButton = document.createElement('button');
             deleteButton.className = 'delete-file';
             deleteButton.textContent = '删除';
@@ -50,6 +78,23 @@
 
             return li;
         }
+        document.getElementById('pauseObservation').addEventListener('click', function() {
+                axios.post('/pause_observation')
+                .then(response => {
+                    const data = response.data;
+                    if (data.status === "paused") {
+                        console.log("检测已手动暂停");
+                        alert(data.message);
+                        checkingNewFiles = false;
+                        document.getElementById('pauseObservation').disabled = true;
+                        document.getElementById('resumeDetection').disabled = false;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error pausing observation:', error);
+                    alert('暂停观察失败：' + (error.response ? error.response.data.error : error.message));
+                });
+        });
 
         function updateFileList(files) {
             const fileList = document.getElementById('fileList');
@@ -69,6 +114,8 @@
                         checkingNewFiles = false;
                         console.log("检测已暂停");
                         alert("检测到新文件，检测已暂停。请查看新文件并点击'继续检测'按钮以恢复检测。");
+                        document.getElementById('pauseObservation').disabled = true;
+                        document.getElementById('resumeDetection').disabled = false;
                         updateFileList(data.files); // 更新文件列表
                     } else {
                         updateFileList(data); // 更新文件列表
@@ -90,10 +137,14 @@
                         alert("检测已恢复，系统将继续监控新文件");
                         checkingNewFiles = true;
                         checkNewFiles();
+                        // 更新 UI
+                        document.getElementById('pauseObservation').disabled = false;
+                        document.getElementById('resumeDetection').disabled = true;
                     }
                 })
                 .catch(error => {
                     console.error('Error resuming detection:', error);
+                    alert('恢复检测失败：' + (error.response ? error.response.data.error : error.message));
                 });
         });
 
@@ -118,6 +169,10 @@
                     });
             }
         });
+        document.addEventListener("DOMContentLoaded", function() {
+            document.getElementById('resumeDetection').disabled = true;
+            document.getElementById('pauseObservation').disabled = false;
+        })
 
         checkNewFiles(); // 开始检查新文件
     </script>
