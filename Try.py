@@ -3,13 +3,13 @@ import os
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from threading import Thread, Event
-from flask import Flask, render_template, send_file, Response, jsonify
+from flask import Flask, render_template, send_file, Response, jsonify, request
 import mimetypes
 
 app = Flask(__name__)
 
 # 设置要监控的目录
-WATCH_DIRECTORY = os.path.expanduser("~/FYPCodes/venv")
+WATCH_DIRECTORY = os.path.expanduser("~/FYPCodes/venv/files")
 app.config['UPLOAD_FOLDER'] = WATCH_DIRECTORY
 
 # 存储检测到的文件
@@ -17,6 +17,9 @@ detected_files = []
 
 # 创建一个事件对象来控制观察者
 observer_event = Event()
+
+# 创建一个全局变量来跟踪检测状态
+detection_active = True
 
 # 创建一个自定义事件处理器
 class MyHandler(FileSystemEventHandler):
@@ -35,6 +38,10 @@ class MyHandler(FileSystemEventHandler):
                 }
                 if new_file not in detected_files:
                     detected_files.append(new_file)
+                    # 检测到新文件后暂停观察者
+                    observer_event.clear()
+                    global detection_active
+                    detection_active = False
 
 # 创建观察者并启动
 def start_observer():
@@ -66,16 +73,9 @@ def download_file(filename):
     # 获取文件的 MIME 类型
     mime_type, _ = mimetypes.guess_type(file_path)
     
-    # 如果是视频文件，使用流式响应
+    # 如果是视频文件，使用 send_file 并支持范围请求
     if mime_type and mime_type.startswith('video'):
-        def generate():
-            with open(file_path, 'rb') as video_file:
-                data = video_file.read(1024 * 1024)  # 每次读取 1MB
-                while data:
-                    yield data
-                    data = video_file.read(1024 * 1024)
-
-        return Response(generate(), mimetype=mime_type)
+        return send_file(file_path, mimetype=mime_type, conditional=True)
     
     # 对于其他文件类型，使用 send_file
     return send_file(file_path, conditional=True)
@@ -84,22 +84,40 @@ def download_file(filename):
 def favicon():
     return '', 200
 
-@app.route('/start_detection')
-def start_detection():
+@app.route('/resume_detection')
+def resume_detection():
+    global detection_active
     observer_event.set()
-    return jsonify({"status": "started"})
+    detection_active = True
+    return jsonify({"status": "resumed"})
 
 @app.route('/get_new_files')
 def get_new_files():
-    return jsonify(detected_files)
+    global detection_active
+    if detection_active:
+        return jsonify(detected_files)
+    else:
+        return jsonify({"status": "paused", "files": detected_files})
+
+@app.route('/delete_file', methods=['POST'])
+def delete_file():
+    file_path = request.json.get('file_path')
+    if file_path:
+        full_path = os.path.join(app.config['UPLOAD_FOLDER'], file_path)
+        if os.path.exists(full_path):
+            os.remove(full_path)
+            global detected_files
+            detected_files = [f for f in detected_files if f['path'] != file_path]
+            return jsonify({"status": "success", "message": "文件已删除"})
+    return jsonify({"status": "error", "message": "文件删除失败"}), 400
 
 if __name__ == '__main__':
     # 在单独的线程中启动文件系统观察者
     observer_thread = Thread(target=start_observer)
     observer_thread.start()
 
-    # 初始化观察者为暂停状态
-    observer_event.clear()
+    # 初始化观察者为运行状态
+    observer_event.set()
 
     # 启动 Flask 应用
     app.run(debug=True, use_reloader=False)

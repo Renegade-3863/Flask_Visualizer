@@ -1,74 +1,125 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>检测到的文件</title>
-    <style>
-        body { font-family: Arial, sans-serif; }
-        .file-list { list-style-type: none; padding: 0; }
-        .file-item { margin-bottom: 10px; }
-    </style>
+    <!-- ... 现有的 head 内容 ... -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 </head>
 <body>
     <h1>检测到的文件</h1>
-    <button id="startDetection">开始检测</button>
+    <button id="resumeDetection">继续检测</button>
     <ul id="fileList" class="file-list">
-    {% for file in files %}
-        <li class="file-item">
-            <strong>{{ file.name }}</strong>
-            {% if file.type == '.mp4' %}
-                <video width="320" height="240" controls>
-                    <source src="{{ url_for('download_file', filename=file.path) }}" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
-            {% elif file.type in ['.pdf', '.doc', '.docx'] %}
-                <a href="{{ url_for('download_file', filename=file.path) }}" target="_blank">查看文档</a>
-            {% endif %}
-        </li>
-    {% endfor %}
+        <!-- 文件列表将通过 JavaScript 动态更新 -->
     </ul>
+
     <script>
-        document.getElementById('startDetection').addEventListener('click', function() {
-            fetch('/start_detection')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === "started") {
-                        console.log("检测已开始");
-                        setTimeout(checkNewFiles, 5000);  // 5秒后检查新文件
+        let checkingNewFiles = true;
+
+        function createFileElement(file) {
+            const li = document.createElement('li');
+            li.className = 'file-item';
+            li.dataset.filePath = file.path;
+
+            const strong = document.createElement('strong');
+            strong.textContent = file.name;
+            li.appendChild(strong);
+
+            if (file.type === '.mp4') {
+                const video = document.createElement('video');
+                video.width = 320;
+                video.height = 240;
+                video.controls = true;
+
+                const source = document.createElement('source');
+                source.src = `/uploads/${file.path}`;
+                source.type = 'video/mp4';
+
+                video.appendChild(source);
+                li.appendChild(video);
+            } else if (['.pdf', '.doc', '.docx'].includes(file.type)) {
+                const a = document.createElement('a');
+                a.href = `/uploads/${file.path}`;
+                a.target = '_blank';
+                a.textContent = '查看文档';
+                li.appendChild(a);
+            }
+
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'delete-file';
+            deleteButton.textContent = '删除';
+            li.appendChild(deleteButton);
+
+            return li;
+        }
+
+        function updateFileList(files) {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = ''; // 清空现有列表
+            files.forEach(file => {
+                fileList.appendChild(createFileElement(file));
+            });
+        }
+
+        function checkNewFiles() {
+            if (!checkingNewFiles) return;
+
+            axios.get('/get_new_files')
+                .then(response => {
+                    const data = response.data;
+                    if (data.status === "paused") {
+                        checkingNewFiles = false;
+                        console.log("检测已暂停");
+                        alert("检测到新文件，检测已暂停。请查看新文件并点击'继续检测'按钮以恢复检测。");
+                        updateFileList(data.files); // 更新文件列表
+                    } else {
+                        updateFileList(data); // 更新文件列表
+                        setTimeout(checkNewFiles, 5000);
                     }
+                })
+                .catch(error => {
+                    console.error('Error fetching new files:', error);
+                    setTimeout(checkNewFiles, 5000);
+                });
+        }
+
+        document.getElementById('resumeDetection').addEventListener('click', function() {
+            axios.get('/resume_detection')
+                .then(response => {
+                    const data = response.data;
+                    if (data.status === "resumed") {
+                        console.log("检测已恢复");
+                        alert("检测已恢复，系统将继续监控新文件");
+                        checkingNewFiles = true;
+                        checkNewFiles();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error resuming detection:', error);
                 });
         });
 
-        function checkNewFiles() {
-            fetch('/get_new_files')
-                .then(response => response.json())
-                .then(files => {
-                    const fileList = document.getElementById('fileList');
-                    const currentFiles = fileList.children.length;
-                    if (files.length > currentFiles) {
-                        for (let i = currentFiles; i < files.length; i++) {
-                            const file = files[i];
-                            const li = document.createElement('li');
-                            li.className = 'file-item';
-                            li.innerHTML = `<strong>${file.name}</strong>`;
-                            if (file.type === '.mp4') {
-                                li.innerHTML += `
-                                    <video width="320" height="240" controls>
-                                        <source src="/uploads/${file.path}" type="video/mp4">
-                                        Your browser does not support the video tag.
-                                    </video>
-                                `;
-                            } else if (['.pdf', '.doc', '.docx'].includes(file.type)) {
-                                li.innerHTML += `
-                                    <a href="/uploads/${file.path}" target="_blank">查看文档</a>
-                                `;
-                            }
-                            fileList.appendChild(li);
+        document.getElementById('fileList').addEventListener('click', function(e) {
+            if (e.target.classList.contains('delete-file')) {
+                const li = e.target.closest('li');
+                const filePath = li.dataset.filePath;
+
+                axios.post('/delete_file', { file_path: filePath })
+                    .then(response => {
+                        const data = response.data;
+                        if (data.status === 'success') {
+                            li.remove();
+                            alert(data.message);
+                        } else {
+                            alert('删除失败：' + data.message);
                         }
-                    }
-                });
-        }
+                    })
+                    .catch(error => {
+                        console.error('Error deleting file:', error);
+                        alert('删除失败：发生错误');
+                    });
+            }
+        });
+
+        checkNewFiles(); // 开始检查新文件
     </script>
 </body>
 </html>
