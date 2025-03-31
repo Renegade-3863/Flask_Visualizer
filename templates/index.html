@@ -3,6 +3,24 @@
 <head>
     <!-- ... 现有的 head 内容 ... -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+    #preview-container {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 20px;
+        border: 1px solid #ccc;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        z-index: 1000;
+    }
+    #preview-content {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+</style>
 </head>
 <body>
     <h1>检测到的文件</h1>
@@ -11,6 +29,10 @@
     <ul id="fileList" class="file-list">
         <!-- 文件列表将通过 JavaScript 动态更新 -->
     </ul>
+    <div id="preview-container">
+        <button id="close-preview">关闭预览</button>
+        <div id="preview-content"></div>
+    </div>
 
     <script>
         let checkingNewFiles = true;
@@ -47,27 +69,28 @@
                 const button = document.createElement('button');
                 button.textContent = '查看文本内容';
                 button.onclick = function() {
-                    axios.get(`/read_text_file/${file.path}`)
-                        .then(response => {
-                            const content = response.data.content;
-                            const textArea = document.createElement('textarea');
-                            textArea.value = content;
-                            textArea.rows = 10;
-                            textArea.cols = 50;
-                            textArea.readOnly = true;
+                    // axios.get(`/read_text_file/${file.path}`)
+                    //     .then(response => {
+                    //         const content = response.data.content;
+                    //         const textArea = document.createElement('textarea');
+                    //         textArea.value = content;
+                    //         textArea.rows = 10;
+                    //         textArea.cols = 50;
+                    //         textArea.readOnly = true;
                     
-                            // 如果已经存在文本区域，就替换它
-                            const existingTextArea = li.querySelector('textarea');
-                            if (existingTextArea) {
-                                li.replaceChild(textArea, existingTextArea);
-                            } else {
-                                li.appendChild(textArea);
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error reading text file:', error);
-                            alert('读取文本文件失败');
-                        });
+                    //         // 如果已经存在文本区域，就替换它
+                    //         const existingTextArea = li.querySelector('textarea');
+                    //         if (existingTextArea) {
+                    //             li.replaceChild(textArea, existingTextArea);
+                    //         } else {
+                    //             li.appendChild(textArea);
+                    //         }
+                    //     })
+                    //     .catch(error => {
+                    //         console.error('Error reading text file:', error);
+                    //         alert('读取文本文件失败');
+                    //     });
+                    showPreview(file.path);
                 };
                 li.appendChild(button);
             }
@@ -128,6 +151,25 @@
                 });
         }
 
+        function showPreview(filePath) {
+            axios.get(`/read_text_file/${filePath}`)
+                .then(response => {
+                    const content = response.data.content;
+                    const previewContent = document.getElementById('preview-content');
+                    previewContent.innerHTML = `<pre>${content}</pre>`;
+                    document.getElementById('preview-container').style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('Error reading text file:', error);
+                    alert('读取文本文件失败');
+                });
+        }
+        
+        document.getElementById('close-preview').addEventListener('click', function() {
+            document.getElementById('preview-container').style.display = 'none';
+            document.getElementById('preview-content').innerHTML = '';
+        });
+
         document.getElementById('resumeDetection').addEventListener('click', function() {
             axios.get('/resume_detection')
                 .then(response => {
@@ -172,6 +214,8 @@
         document.addEventListener("DOMContentLoaded", function() {
             document.getElementById('resumeDetection').disabled = true;
             document.getElementById('pauseObservation').disabled = false;
+            document.getElementById('preview-container').style.display = 'none';
+            document.getElementById('preview-content').innerHTML = '';
         })
 
         checkNewFiles(); // 开始检查新文件

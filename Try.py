@@ -22,6 +22,7 @@ observer_event = Event()
 detection_active = True
 
 # 创建一个自定义事件处理器
+# 个人认为本项目的处理流程并不需要用到 on_changed 方法，不过还是写入进来以防万一
 class MyHandler(FileSystemEventHandler):
     def on_created(self, event):
         if not event.is_directory:
@@ -42,6 +43,26 @@ class MyHandler(FileSystemEventHandler):
                     observer_event.clear()
                     global detection_active
                     detection_active = False
+    def on_changed(self, event):
+        if not event.is_directory:
+            file_path = event.src_path
+            file_name = os.path.basename(file_path)
+            _, file_extension = os.path.splitext(file_name)
+
+            if file_extension.lower() in ['.mp4', '.pdf', '.doc', '.docx', '.txt']:
+                print(f"File {file_path} has been changed")
+                new_file = {
+                    'name': file_name,
+                    'path': os.path.relpath(file_path, WATCH_DIRECTORY),
+                    'type': file_extension.lower()
+                }
+                if new_file not in detected_files:
+                    detected_files.append(new_file)
+                    # 检测到新文件后暂停观察者
+                    observer_event.clear()
+                    global detection_active
+                    detection_active = False
+
 
 # 创建观察者并启动
 def start_observer():
