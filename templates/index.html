@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- ... 现有的 head 内容 ... -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <style>
     #preview-container {
@@ -20,8 +19,9 @@
         max-height: 400px;
         overflow-y: auto;
     }
-</style>
+    </style>
 </head>
+<link rel="stylesheet" type="text/css" href="/static/styles.css">
 <body>
     <h1>检测到的文件</h1>
     <button id="resumeDetection">继续检测</button>
@@ -90,6 +90,7 @@
                     //         console.error('Error reading text file:', error);
                     //         alert('读取文本文件失败');
                     //     });
+                    // 更新：showPreview 函数封装了上面的整体流程，优化了代码结构
                     showPreview(file.path);
                 };
                 li.appendChild(button);
