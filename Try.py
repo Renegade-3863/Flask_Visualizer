@@ -146,8 +146,8 @@ def delete_file():
             os.remove(full_path)
             global detected_files
             detected_files = [f for f in detected_files if f['path'] != file_path]
-            return jsonify({"status": "success", "message": "文件已删除"})
-    return jsonify({"status": "error", "message": "文件删除失败"}), 400
+            return jsonify({"status": "success", "message": "file deleted"})
+    return jsonify({"status": "error", "message": "file deletion failed"}), 400
 
 @app.route('/read_text_file/<path:filename>')
 def read_text_file(filename):
@@ -164,7 +164,7 @@ def pause_observation():
     global detection_active
     observer_event.clear()
     detection_active = False
-    return jsonify({"status": "paused", "message": "观察已手动暂停"})
+    return jsonify({"status": "paused", "message": "observation suspended"})
 
 if __name__ == '__main__':
     # 在单独的线程中启动文件系统观察者
