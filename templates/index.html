@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="/static/styles.css"> <!-- 引入CSS文件 -->
     <style>
     #preview-container {
         display: none;
@@ -19,25 +20,39 @@
         max-height: 400px;
         overflow-y: auto;
     }
+    #latest-file {
+        display: block; /* 初始状态为显示 */
+        position: fixed; /* 修改为固定定位 */
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(1.5); /* 居中并放大 */
+        border: 2px solid red;
+        padding: 10px;
+        background-color: #f9f9f9;
+        z-index: 1000; /* 提高层级 */
+    }
     </style>
 </head>
-<link rel="stylesheet" type="text/css" href="/static/styles.css">
 <body>
-    <h1>检测到的文件</h1>
-    <button id="resumeDetection">继续检测</button>
-    <button id="pauseObservation">暂停检测</button>
+    <h1>Fall Detection</h1>
+    <div id="latest-file"></div>
+    <div style="text-align: left; margin-bottom: 20px;">
+        <button id="toggleLatestFile" style="display: block; margin-bottom: 20px;">close the latest file display window</button> <!-- 添加按钮 -->
+        <button id="resumeDetection" style="display: block; margin-bottom: 20px;">continue detection</button>
+        <button id="pauseObservation" style="display: block; margin-bottom: 20px;">pause derection</button>
+    </div>
     <ul id="fileList" class="file-list">
         <!-- 文件列表将通过 JavaScript 动态更新 -->
     </ul>
     <div id="preview-container">
-        <button id="close-preview">关闭预览</button>
+        <button id="close-preview">close preview</button>
         <div id="preview-content"></div>
     </div>
 
     <script>
         let checkingNewFiles = true;
 
-        function createFileElement(file) {
+        function createFileElement(file, isLatest = false) {
             const li = document.createElement('li');
             li.className = 'file-item';
             li.dataset.filePath = file.path;
@@ -63,51 +78,33 @@
                 const a = document.createElement('a');
                 a.href = `/uploads/${file.path}`;
                 a.target = '_blank';
-                a.textContent = '查看文档';
+                a.textContent = 'View Document';
                 li.appendChild(a);
             } else if (file.type === '.txt') {
                 const button = document.createElement('button');
-                button.textContent = '查看文本内容';
+                button.textContent = 'view the text content';
                 button.onclick = function() {
-                    // axios.get(`/read_text_file/${file.path}`)
-                    //     .then(response => {
-                    //         const content = response.data.content;
-                    //         const textArea = document.createElement('textarea');
-                    //         textArea.value = content;
-                    //         textArea.rows = 10;
-                    //         textArea.cols = 50;
-                    //         textArea.readOnly = true;
-                    
-                    //         // 如果已经存在文本区域，就替换它
-                    //         const existingTextArea = li.querySelector('textarea');
-                    //         if (existingTextArea) {
-                    //             li.replaceChild(textArea, existingTextArea);
-                    //         } else {
-                    //             li.appendChild(textArea);
-                    //         }
-                    //     })
-                    //     .catch(error => {
-                    //         console.error('Error reading text file:', error);
-                    //         alert('读取文本文件失败');
-                    //     });
-                    // 更新：showPreview 函数封装了上面的整体流程，优化了代码结构
                     showPreview(file.path);
                 };
                 li.appendChild(button);
             }
-            const deleteButton = document.createElement('button');
-            deleteButton.className = 'delete-file';
-            deleteButton.textContent = '删除';
-            li.appendChild(deleteButton);
+
+            if (!isLatest) {
+                const deleteButton = document.createElement('button');
+                deleteButton.className = 'delete-file';
+                deleteButton.textContent = 'Delete';
+                li.appendChild(deleteButton);
+            }
 
             return li;
         }
+
         document.getElementById('pauseObservation').addEventListener('click', function() {
                 axios.post('/pause_observation')
                 .then(response => {
                     const data = response.data;
                     if (data.status === "paused") {
-                        console.log("检测已手动暂停");
+                        console.log("detection has been paused manually");
                         alert(data.message);
                         checkingNewFiles = false;
                         document.getElementById('pauseObservation').disabled = true;
@@ -116,15 +113,27 @@
                 })
                 .catch(error => {
                     console.error('Error pausing observation:', error);
-                    alert('暂停观察失败：' + (error.response ? error.response.data.error : error.message));
+                    alert('observation failed: ' + (error.response ? error.response.data.error : error.message));
                 });
         });
 
         function updateFileList(files) {
             const fileList = document.getElementById('fileList');
+            const latestFileContainer = document.getElementById('latest-file');
             fileList.innerHTML = ''; // 清空现有列表
-            files.forEach(file => {
-                fileList.appendChild(createFileElement(file));
+            latestFileContainer.innerHTML = ''; // 清空最新文件显示
+
+            // 按照文件的创建时间降序排序（最新的文件在前）
+            files.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            files.forEach((file, index) => {
+                const fileElement = createFileElement(file);
+                fileList.appendChild(fileElement);
+
+                // 将最新的文件放大显示
+                if (index === 0) {
+                    latestFileContainer.appendChild(createFileElement(file, true));
+                }
             });
         }
 
@@ -137,7 +146,9 @@
                     if (data.status === "paused") {
                         checkingNewFiles = false;
                         console.log("检测已暂停");
-                        alert("检测到新文件，检测已暂停。请查看新文件并点击'继续检测'按钮以恢复检测。");
+                        // alert 添加当前时间戳
+
+                        alert("New file detected on " + new Date().toLocaleString() + ", the automatic detection has been paused, press on continue detection to continue");
                         document.getElementById('pauseObservation').disabled = true;
                         document.getElementById('resumeDetection').disabled = false;
                         updateFileList(data.files); // 更新文件列表
@@ -162,7 +173,7 @@
                 })
                 .catch(error => {
                     console.error('Error reading text file:', error);
-                    alert('读取文本文件失败');
+                    alert('fail reading text content');
                 });
         }
         
@@ -176,8 +187,8 @@
                 .then(response => {
                     const data = response.data;
                     if (data.status === "resumed") {
-                        console.log("检测已恢复");
-                        alert("检测已恢复，系统将继续监控新文件");
+                        console.log("detection restored");
+                        alert("detection restored, the system will continue to monitor new files");
                         checkingNewFiles = true;
                         checkNewFiles();
                         // 更新 UI
@@ -187,7 +198,7 @@
                 })
                 .catch(error => {
                     console.error('Error resuming detection:', error);
-                    alert('恢复检测失败：' + (error.response ? error.response.data.error : error.message));
+                    alert('detection restoration failed' + (error.response ? error.response.data.error : error.message));
                 });
         });
 
@@ -203,15 +214,27 @@
                             li.remove();
                             alert(data.message);
                         } else {
-                            alert('删除失败：' + data.message);
+                            alert('deletion failed：' + data.message);
                         }
                     })
                     .catch(error => {
                         console.error('Error deleting file:', error);
-                        alert('删除失败：发生错误');
+                        alert('deletion failed: error generated');
                     });
             }
         });
+
+        document.getElementById('toggleLatestFile').addEventListener('click', function() {
+            const latestFileContainer = document.getElementById('latest-file');
+            if (latestFileContainer.style.display === 'none') {
+                latestFileContainer.style.display = 'block';
+                this.textContent = 'close the latest file display window';
+            } else {
+                latestFileContainer.style.display = 'none';
+                this.textContent = 'open the latest file display window';
+            }
+        });
+
         document.addEventListener("DOMContentLoaded", function() {
             document.getElementById('resumeDetection').disabled = true;
             document.getElementById('pauseObservation').disabled = false;

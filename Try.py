@@ -1,5 +1,6 @@
 import time
 import os
+from datetime import datetime
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from threading import Thread, Event
@@ -116,9 +117,25 @@ def resume_detection():
 def get_new_files():
     global detection_active
     if detection_active:
-        return jsonify(detected_files)
+        return jsonify(get_sorted_files())
     else:
-        return jsonify({"status": "paused", "files": detected_files})
+        return jsonify({"status": "paused", "files": get_sorted_files()})
+
+def get_sorted_files():
+    files = []
+    upload_folder = app.config['UPLOAD_FOLDER']
+    for filename in os.listdir(upload_folder):
+        file_path = os.path.join(upload_folder, filename)
+        created_time = os.path.getctime(file_path)
+        files.append({
+            "name": filename,
+            "path": filename,
+            "type": os.path.splitext(filename)[1],
+            "created_at": datetime.fromtimestamp(created_time).isoformat()
+        })
+    
+    # 按创建时间降序排序
+    return sorted(files, key=lambda x: x['created_at'], reverse=True)
 
 @app.route('/delete_file', methods=['POST'])
 def delete_file():
