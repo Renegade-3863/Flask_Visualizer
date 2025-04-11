@@ -6,11 +6,16 @@ from watchdog.events import FileSystemEventHandler
 from threading import Thread, Event
 from flask import Flask, render_template, send_file, Response, jsonify, request
 import mimetypes
+import matplotlib
+import matplotlib.pyplot as plt
 
 app = Flask(__name__)
 
+results = []
+matplotlib.use('Agg')  # 添加这一行以使用非交互式后端
+
 # 设置要监控的目录
-WATCH_DIRECTORY = os.path.expanduser("~/FYPCodes/venv/files")
+WATCH_DIRECTORY = os.path.expanduser("~/FYPfiles/venv/files")
 app.config['UPLOAD_FOLDER'] = WATCH_DIRECTORY
 
 # 存储检测到的文件
@@ -116,10 +121,56 @@ def resume_detection():
 @app.route('/get_new_files')
 def get_new_files():
     global detection_active
+
     if detection_active:
         return jsonify(get_sorted_files())
     else:
         return jsonify({"status": "paused", "files": get_sorted_files()})
+
+@app.route('/get_detection_chart', methods=['GET'])
+def get_detection_chart():
+    
+    # 生成折线图
+    files = [
+        {"name": "Fall_2025/04/11", "path": "Fall_2025/04/11"},
+        {"name": "Not Fall_2025/04/12", "path": "Not Fall_2025/04/12"},
+        {"name": "Fall_2025/04/13", "path": "Fall_2025/04/13"},
+        {"name": "Fall_2025/04/14", "path": "Fall_2025/04/14"},
+        {"name": "Not Fall_2025/04/15", "path": "Not Fall_2025/04/15"},
+        {"name": "Not Fall_2025/04/16", "path": "Not Fall_2025/04/16"},
+        {"name": "Fall_2025/04/17", "path": "Fall_2025/04/17"},
+        {"name": "Not Fall_2025/04/18", "path": "Not Fall_2025/04/18"},
+        {"name": "Fall_2025/04/19", "path": "Fall_2025/04/19"},
+        {"name": "Not Fall_2025/04/20", "path": "Not Fall_2025/04/20"}
+    ]
+    
+    # 按下划线进行 parsing
+    for file in files:
+        date_str = file['name'].split('_')[1]
+        date = datetime.strptime(date_str, '%Y/%m/%d').date()
+        result = 1 if 'Not Fall' in file['name'] else 0
+        results.append((date, result))
+    
+    dates = [result[0] for result in results]
+    values = [result[1] for result in results]
+
+    for date in dates:
+        print(date)
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(dates, values, marker='o')
+    plt.xlabel('Date')
+    plt.ylabel('Detection Result (Fall=0, Not Fall=1)')
+    plt.title('Fall Detection Results')
+    plt.grid(True)
+
+    chart_path = 'static/detection_chart.png'
+    plt.savefig(chart_path)
+    plt.close()
+
+    # 绘制完成，清空 results
+    results.clear()
+    return send_file(chart_path, mimetype='image/png')
 
 def get_sorted_files():
     files = []

@@ -4,6 +4,9 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <link rel="stylesheet" type="text/css" href="/static/styles.css"> <!-- 引入CSS文件 -->
     <style>
+    #container {
+        display: flex;
+    }
     #preview-container {
         display: none;
         position: fixed;
@@ -31,19 +34,43 @@
         background-color: #f9f9f9;
         z-index: 1000; /* 提高层级 */
     }
+    #button-list {
+        width: 20%;
+        padding: 20px;
+        box-sizing: border-box;
+    }
+    #content {
+        width: 80%;
+        padding: 20px;
+        box-sizing: border-box;
+    }
+    #fileList {
+        margin-top: 20px;
+    }
     </style>
 </head>
 <body>
     <h1>Fall Detection</h1>
-    <div id="latest-file"></div>
-    <div style="text-align: left; margin-bottom: 20px;">
-        <button id="toggleLatestFile" style="display: block; margin-bottom: 20px;">close the latest file display window</button> <!-- 添加按钮 -->
-        <button id="resumeDetection" style="display: block; margin-bottom: 20px;">continue detection</button>
-        <button id="pauseObservation" style="display: block; margin-bottom: 20px;">pause derection</button>
+    <div id="container">
+        <div id="button-list">
+            <button id="toggleLatestFile" style="display: block; margin-bottom: 20px;">close the latest file display</button>
+            <button id="resumeDetection" style="display: block; margin-bottom: 20px;">continue detection</button>
+            <button id="pauseObservation" style="display: block; margin-bottom: 20px;">pause derection</button>
+            <button id="getDetectionChart" style="display: block; margin-bottom: 20px;">Get Detection Chart</button>
+            <button id="toggleChart" style="display: block; margin-bottom: 20px;">Show Detection Chart</button>
+        </div>
+        <div id="content">
+            <div id="latest-file"></div>
+            <ul id="fileList" class="file-list">
+                <!-- 文件列表将通过 JavaScript 动态更新 -->
+            </ul>
+        </div>
+        <div id="chart-container" style="display: none;">
+            <!-- <button id="close-chart">Close Chart</button> -->
+            <img id="detectionChart" style="display: block; margin-top: 20px;" />
+        </div>
     </div>
-    <ul id="fileList" class="file-list">
-        <!-- 文件列表将通过 JavaScript 动态更新 -->
-    </ul>
+    <img id="detectionChart" style="display: none; margin-top: 20px;" />
     <div id="preview-container">
         <button id="close-preview">close preview</button>
         <div id="preview-content"></div>
@@ -117,6 +144,21 @@
                 });
         });
 
+        document.getElementById('getDetectionChart').addEventListener('click', function() {
+            axios.get('/get_detection_chart')
+                .then(response => {
+                    const chart = document.getElementById('detectionChart');
+                    chart.src = '/static/detection_chart.png';
+                    chart.style.display = 'block';
+                    document.getElementById('chart-container').style.display = 'block';
+                    document.getElementById('toggleChart').textContent = 'Hide Detection Chart';
+                })
+                .catch(error => {
+                    console.error('Error fetching detection chart:', error);
+                    alert('Failed to fetch detection chart');
+                });
+        });
+
         function updateFileList(files) {
             const fileList = document.getElementById('fileList');
             const latestFileContainer = document.getElementById('latest-file');
@@ -151,6 +193,10 @@
                         alert("New file detected on " + new Date().toLocaleString() + ", the automatic detection has been paused, press on continue detection to continue");
                         document.getElementById('pauseObservation').disabled = true;
                         document.getElementById('resumeDetection').disabled = false;
+                        // 显示最新文件
+                        document.getElementById('latest-file').style.display = 'block';
+                        // 更新显示最新文件的按钮状态
+                        document.getElementById('toggleLatestFile').textContent = 'close the latest file display';
                         updateFileList(data.files); // 更新文件列表
                     } else {
                         updateFileList(data); // 更新文件列表
@@ -228,12 +274,28 @@
             const latestFileContainer = document.getElementById('latest-file');
             if (latestFileContainer.style.display === 'none') {
                 latestFileContainer.style.display = 'block';
-                this.textContent = 'close the latest file display window';
+                this.textContent = 'close the latest file display';
             } else {
                 latestFileContainer.style.display = 'none';
-                this.textContent = 'open the latest file display window';
+                this.textContent = 'open the latest file display';
             }
         });
+
+        document.getElementById('toggleChart').addEventListener('click', function() {
+        const chartContainer = document.getElementById('chart-container');
+            if (chartContainer.style.display === 'none') {
+                chartContainer.style.display = 'block';
+                this.textContent = 'Hide Detection Chart';
+            } else {
+                chartContainer.style.display = 'none';
+                this.textContent = 'Show Detection Chart';
+            }
+        });
+
+        // document.getElementById('close-chart').addEventListener('click', function() {
+        //     document.getElementById('chart-container').style.display = 'none';
+        //     document.getElementById('toggleChart').textContent = 'Show Detection Chart';
+        // });
 
         document.addEventListener("DOMContentLoaded", function() {
             document.getElementById('resumeDetection').disabled = true;
