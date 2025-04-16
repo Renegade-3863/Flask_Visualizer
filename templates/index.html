@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- introduce the axios library, used for doing http request-->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <link rel="stylesheet" type="text/css" href="/static/styles.css"> <!-- 引入CSS文件 -->
+    <link rel="stylesheet" type="text/css" href="/static/styles.css"> <!-- using css as the render of the webpage -->
     <style>
     #container {
         display: flex;
@@ -23,7 +24,7 @@
         max-height: 400px;
         overflow-y: auto;
     }
-    #latest-file {
+    #latest-file-display {
         display: block; /* 初始状态为显示 */
         position: fixed; /* 修改为固定定位 */
         top: 50%;
@@ -55,12 +56,12 @@
         <div id="button-list">
             <button id="toggleLatestFile" style="display: block; margin-bottom: 20px;">close the latest file display</button>
             <button id="resumeDetection" style="display: block; margin-bottom: 20px;">continue detection</button>
-            <button id="pauseObservation" style="display: block; margin-bottom: 20px;">pause derection</button>
+            <button id="pauseObservation" style="display: block; margin-bottom: 20px;">pause detection</button>
             <button id="getDetectionChart" style="display: block; margin-bottom: 20px;">Get Detection Chart</button>
             <button id="toggleChart" style="display: block; margin-bottom: 20px;">Show Detection Chart</button>
         </div>
         <div id="content">
-            <div id="latest-file"></div>
+            <div id="latest-file-display"></div>
             <ul id="fileList" class="file-list">
                 <!-- 文件列表将通过 JavaScript 动态更新 -->
             </ul>
@@ -101,19 +102,8 @@
 
                 video.appendChild(source);
                 li.appendChild(video);
-            } else if (['.pdf', '.doc', '.docx'].includes(file.type)) {
-                const a = document.createElement('a');
-                a.href = `/uploads/${file.path}`;
-                a.target = '_blank';
-                a.textContent = 'View Document';
-                li.appendChild(a);
-            } else if (file.type === '.txt') {
-                const button = document.createElement('button');
-                button.textContent = 'view the text content';
-                button.onclick = function() {
-                    showPreview(file.path);
-                };
-                li.appendChild(button);
+            } else {
+                // Do nothing when other files arrives
             }
 
             if (!isLatest) {
@@ -161,7 +151,7 @@
 
         function updateFileList(files) {
             const fileList = document.getElementById('fileList');
-            const latestFileContainer = document.getElementById('latest-file');
+            const latestFileContainer = document.getElementById('latest-file-display');
             fileList.innerHTML = ''; // 清空现有列表
             latestFileContainer.innerHTML = ''; // 清空最新文件显示
 
@@ -194,7 +184,7 @@
                         document.getElementById('pauseObservation').disabled = true;
                         document.getElementById('resumeDetection').disabled = false;
                         // 显示最新文件
-                        document.getElementById('latest-file').style.display = 'block';
+                        document.getElementById('latest-file-display').style.display = 'block';
                         // 更新显示最新文件的按钮状态
                         document.getElementById('toggleLatestFile').textContent = 'close the latest file display';
                         updateFileList(data.files); // 更新文件列表
@@ -206,20 +196,6 @@
                 .catch(error => {
                     console.error('Error fetching new files:', error);
                     setTimeout(checkNewFiles, 5000);
-                });
-        }
-
-        function showPreview(filePath) {
-            axios.get(`/read_text_file/${filePath}`)
-                .then(response => {
-                    const content = response.data.content;
-                    const previewContent = document.getElementById('preview-content');
-                    previewContent.innerHTML = `<pre>${content}</pre>`;
-                    document.getElementById('preview-container').style.display = 'block';
-                })
-                .catch(error => {
-                    console.error('Error reading text file:', error);
-                    alert('fail reading text content');
                 });
         }
         
@@ -271,7 +247,7 @@
         });
 
         document.getElementById('toggleLatestFile').addEventListener('click', function() {
-            const latestFileContainer = document.getElementById('latest-file');
+            const latestFileContainer = document.getElementById('latest-file-display');
             if (latestFileContainer.style.display === 'none') {
                 latestFileContainer.style.display = 'block';
                 this.textContent = 'close the latest file display';
@@ -291,11 +267,6 @@
                 this.textContent = 'Show Detection Chart';
             }
         });
-
-        // document.getElementById('close-chart').addEventListener('click', function() {
-        //     document.getElementById('chart-container').style.display = 'none';
-        //     document.getElementById('toggleChart').textContent = 'Show Detection Chart';
-        // });
 
         document.addEventListener("DOMContentLoaded", function() {
             document.getElementById('resumeDetection').disabled = true;

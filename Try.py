@@ -3,11 +3,16 @@ import os
 from datetime import datetime
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-from threading import Thread, Event
-from flask import Flask, render_template, send_file, Response, jsonify, request
+from threading import Thread
+from threading import Event
+from flask import Flask
+from flask import render_template
+from flask import send_file
+from flask import Response
+from flask import jsonify
+from flask import request
 import mimetypes
-import matplotlib
-import matplotlib.pyplot as plt
+import matplotlib.pyplot
 
 app = Flask(__name__)
 
@@ -36,12 +41,12 @@ class MyHandler(FileSystemEventHandler):
             file_name = os.path.basename(file_path)
             _, file_extension = os.path.splitext(file_name)
             
-            if file_extension.lower() in ['.mp4', '.pdf', '.doc', '.docx', '.txt']:
+            if file_extension == '.mp4':
                 print(f"File {file_path} has been created")
                 new_file = {
                     'name': file_name,
                     'path': os.path.relpath(file_path, WATCH_DIRECTORY),
-                    'type': file_extension.lower()
+                    'type': file_extension
                 }
                 if new_file not in detected_files:
                     detected_files.append(new_file)
@@ -55,12 +60,12 @@ class MyHandler(FileSystemEventHandler):
             file_name = os.path.basename(file_path)
             _, file_extension = os.path.splitext(file_name)
 
-            if file_extension.lower() in ['.mp4', '.pdf', '.doc', '.docx', '.txt']:
+            if file_extension == '.mp4':
                 print(f"File {file_path} has been changed")
                 new_file = {
                     'name': file_name,
                     'path': os.path.relpath(file_path, WATCH_DIRECTORY),
-                    'type': file_extension.lower()
+                    'type': file_extension
                 }
                 if new_file not in detected_files:
                     detected_files.append(new_file)
@@ -157,16 +162,16 @@ def get_detection_chart():
     for date in dates:
         print(date)
 
-    plt.figure(figsize=(10, 5))
-    plt.plot(dates, values, marker='o')
-    plt.xlabel('Date')
-    plt.ylabel('Detection Result (Fall=0, Not Fall=1)')
-    plt.title('Fall Detection Results')
-    plt.grid(True)
+    matplotlib.pyplot .figure(figsize=(10, 5))
+    matplotlib.pyplot .plot(dates, values, marker='o')
+    matplotlib.pyplot .xlabel('Date')
+    matplotlib.pyplot .ylabel('Detection Result (Fall=0, Not Fall=1)')
+    matplotlib.pyplot .title('Fall Detection Results')
+    matplotlib.pyplot .grid(True)
 
     chart_path = 'static/detection_chart.png'
-    plt.savefig(chart_path)
-    plt.close()
+    matplotlib.pyplot .savefig(chart_path)
+    matplotlib.pyplot .close()
 
     # 绘制完成，清空 results
     results.clear()
@@ -200,30 +205,16 @@ def delete_file():
             return jsonify({"status": "success", "message": "file deleted"})
     return jsonify({"status": "error", "message": "file deletion failed"}), 400
 
-@app.route('/read_text_file/<path:filename>')
-def read_text_file(filename):
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    try:
-        with open(file_path, 'r', encoding='utf-8') as file:
-            content = file.read()
-        return jsonify({"content": content})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
 @app.route('/pause_observation', methods=['POST'])
 def pause_observation():
     global detection_active
     observer_event.clear()
     detection_active = False
-    return jsonify({"status": "paused", "message": "observation suspended"})
+    return jsonify({"status": "paused", "message": "observation is now suspended"})
 
 if __name__ == '__main__':
-    # 在单独的线程中启动文件系统观察者
-    observer_thread = Thread(target=start_observer)
-    observer_thread.start()
+    Thread(target=start_observer).start()
 
-    # 初始化观察者为运行状态
     observer_event.set()
 
-    # 启动 Flask 应用
     app.run(debug=True, use_reloader=False)
