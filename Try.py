@@ -11,11 +11,10 @@ from flask import send_file
 from flask import Response
 from flask import jsonify
 from flask import request
+from flask import copy_current_request_context
 import mimetypes
 import matplotlib.pyplot
-import asyncio
-import aiofiles
-
+from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
 
@@ -35,17 +34,16 @@ observer_event = Event()
 # 创建一个全局变量来跟踪检测状态
 detection_active = True
 
-# helper function 
-def get_ext(event):
-    useless, ext = os.path.splitext(os.path.basename(event.src_path))
-    return useless, ext
+executor = ThreadPoolExecutor(max_workers=8)
 
 # 创建一个自定义事件处理器
 # 个人认为本项目的处理流程并不需要用到 on_changed 方法，不过还是写入进来以防万一
 class MyHandler(FileSystemEventHandler):
     def on_created(self, event):
         if not event.is_directory:
-            file_extension = get_ext(event)
+            file_path = event.src_path
+            file_name = os.path.basename(file_path)
+            useless, file_extension = os.path.splitext(file_name)
             
             if file_extension == '.mp4':
                 print(f"File {file_path} has been created")
@@ -62,7 +60,9 @@ class MyHandler(FileSystemEventHandler):
                     detection_active = False
     def on_changed(self, event):
         if not event.is_directory:
-            file_extension = get_ext(event)
+            file_path = event.src_path
+            file_name = os.path.basename(file_path)
+            useless, file_extension = os.path.splitext(file_name)
 
             if file_extension == '.mp4':
                 print(f"File {file_path} has been changed")
@@ -103,23 +103,25 @@ def index():
     return render_template('index.html', files=detected_files)
 
 @app.route('/uploads/<path:filename>')
-async def download_file(filename):
-    file_path = os.path.join(WATCH_DIRECTORY, filename)
+def download_file(filename):
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     
-    # acquire the MIME(Multipurpose Internet Mail Extensions) information of the file monitored
+    # 获取文件的 MIME 类型
     mime_type, _ = mimetypes.guess_type(file_path)
+
+    @copy_current_request_context
+    def send_file_async(file_path, mime_type):
+        return send_file(file_path, mimetype=mime_type, conditional=True)
     
+    # 如果是视频文件，使用 send_file 并支持范围请求
     if mime_type and mime_type.startswith('video'):
-        # send_file function originated from flask is not compatible with the await feature, we use Response instead
-        async with aiofiles.open(file_path, mode='rb') as f:
-            content = await f.read()
-        return Response(content, mimetype=mime_type)
+        future = executor.submit(send_file_async, file_path, mime_type)
+        return future.result()
         # return send_file(file_path, mimetype=mime_type, conditional=True)
     
-    # send_file function originated from flask is not compatible with the await feature, we use Response instead
-    async with aiofiles.open(file_path, mode='rb') as f:
-        content = await f.read()
-    return Response(content, mimetype=mime_type)
+    # 对于其他文件类型，使用 send_file
+    future = executor.submit(send_file_async, file_path, None)
+    return future.result()
     # return send_file(file_path, conditional=True)
 
 @app.route('/favicon.ico')
@@ -143,7 +145,7 @@ def get_new_files():
         return jsonify({"status": "paused", "files": get_sorted_files()})
 
 @app.route('/get_detection_chart', methods=['GET'])
-async def get_detection_chart():
+def get_detection_chart():
     
     # 生成折线图
     files = [
@@ -185,12 +187,7 @@ async def get_detection_chart():
 
     # 绘制完成，清空 results
     results.clear()
-    # acquire the MIME(Multipurpose Internet Mail Extensions) information of the file monitored
-    mime_type, _ = mimetypes.guess_type(chart_path)
-    async with aiofiles.open(chart_path, mode='rb') as f:
-        content = await f.read()
-    return Response(content, mimetype=mime_type)
-    # return send_file(chart_path, mimetype='image/png')
+    return send_file(chart_path, mimetype='image/png')
 
 def get_sorted_files():
     files = []
