@@ -59,6 +59,7 @@
             <button id="pauseObservation" style="display: block; margin-bottom: 20px;">pause detection</button>
             <button id="getDetectionChart" style="display: block; margin-bottom: 20px;">Get Detection Chart</button>
             <button id="toggleChart" style="display: block; margin-bottom: 20px;">Show Detection Chart</button>
+            <input type="date" id="chartDate" style="display: block; margin-bottom: 20px;">
         </div>
         <div id="content">
             <div id="latest-file-display"></div>
@@ -135,10 +136,18 @@
         });
 
         document.getElementById('getDetectionChart').addEventListener('click', function() {
-            axios.get('/get_detection_chart')
+            const date = document.getElementById('chartDate').value;
+            alert(date);
+            if (!date) {
+                alert('Please select a date');
+                return;
+            }
+            // alert('Selected date:', date);
+            axios.get('/get_detection_chart', {params:{date: date}})
                 .then(response => {
                     const chart = document.getElementById('detectionChart');
-                    chart.src = '/static/detection_chart.png';
+                    const timestamp = new Date().getTime();
+                    chart.src = '/static/detection_chart.png?t=' + timestamp;
                     chart.style.display = 'block';
                     document.getElementById('chart-container').style.display = 'block';
                     document.getElementById('toggleChart').textContent = 'Hide Detection Chart';

@@ -15,10 +15,13 @@ from flask import copy_current_request_context
 import mimetypes
 import matplotlib.pyplot
 from concurrent.futures import ThreadPoolExecutor
+# Use Redis to store the average high frequency falling time interval 
+import redis
 
 app = Flask(__name__)
 
-results = []
+# No need for a global results array
+# results = []
 matplotlib.use('Agg')  # 添加这一行以使用非交互式后端
 
 # 设置要监控的目录
@@ -35,6 +38,14 @@ observer_event = Event()
 detection_active = True
 
 executor = ThreadPoolExecutor(max_workers=8)
+
+# Handle redis connection, use the default localhost and port for testing
+redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
+
+# Initialize the Redis configuration, reset corresponding data
+def init_redis():
+    # Flush the database
+    redis_client.flushdb()
 
 # 创建一个自定义事件处理器
 # 个人认为本项目的处理流程并不需要用到 on_changed 方法，不过还是写入进来以防万一
@@ -58,6 +69,27 @@ class MyHandler(FileSystemEventHandler):
                     observer_event.clear()
                     global detection_active
                     detection_active = False
+
+                    date_str = file_name.split('_')[1]
+                    time_str = file_name.split('_')[2]
+                    # Need to remove the .mp4 suffix
+                    time_str = time_str.replace('.mp4', '')
+                    date = datetime.strptime(date_str, '%Y:%m:%d').date()
+                    time = datetime.strptime(time_str, '%H:%M:%S').time()
+
+                    # For testing purpose
+                    print("When updating:\n")
+                    print(date)
+                    print(time)
+                    
+                    is_fall = 1 if 'FALL' in file_name else 0
+
+                    # Update Redis if is_fall 
+                    # No need to do extra useless work if is_fall == 0
+                    if is_fall == 1:
+                        redis_key = f"fall_data:{date}"
+                        redis_client.hincrby(redis_key, time.hour, 1)
+
     def on_changed(self, event):
         if not event.is_directory:
             file_path = event.src_path
@@ -146,48 +178,50 @@ def get_new_files():
 
 @app.route('/get_detection_chart', methods=['GET'])
 def get_detection_chart():
-    
-    # 生成折线图
-    files = [
-        {"name": "Fall_2025/04/11", "path": "Fall_2025/04/11"},
-        {"name": "Not Fall_2025/04/12", "path": "Not Fall_2025/04/12"},
-        {"name": "Fall_2025/04/13", "path": "Fall_2025/04/13"},
-        {"name": "Fall_2025/04/14", "path": "Fall_2025/04/14"},
-        {"name": "Not Fall_2025/04/15", "path": "Not Fall_2025/04/15"},
-        {"name": "Not Fall_2025/04/16", "path": "Not Fall_2025/04/16"},
-        {"name": "Fall_2025/04/17", "path": "Fall_2025/04/17"},
-        {"name": "Not Fall_2025/04/18", "path": "Not Fall_2025/04/18"},
-        {"name": "Fall_2025/04/19", "path": "Fall_2025/04/19"},
-        {"name": "Not Fall_2025/04/20", "path": "Not Fall_2025/04/20"}
-    ]
-    
-    # 按下划线进行 parsing
-    for file in files:
-        date_str = file['name'].split('_')[1]
-        date = datetime.strptime(date_str, '%Y/%m/%d').date()
-        result = 1 if 'Not Fall' in file['name'] else 0
-        results.append((date, result))
-    
-    dates = [result[0] for result in results]
-    values = [result[1] for result in results]
+    # Acquire the current date information from the HTTP request header
+    date_str = request.args.get('date')
+    # For testing purpose
+    print(date_str)
 
-    for date in dates:
-        print(date)
+    # Defensive programming
+    if not date_str:
+        return jsonify({"status": "error", "message": "Invalid date format"})
+    
+    # Still defensive programming
+    try:
+        date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({"status": "error", "message": "Invalid date format"}) 
 
-    matplotlib.pyplot .figure(figsize=(10, 5))
-    matplotlib.pyplot .plot(dates, values, marker='o')
-    matplotlib.pyplot .xlabel('Date')
-    matplotlib.pyplot .ylabel('Detection Result (Fall=0, Not Fall=1)')
-    matplotlib.pyplot .title('Fall Detection Results')
-    matplotlib.pyplot .grid(True)
+    # Retrieve data from Redis
+    redis_key = f"fall_data:{date}"
+    fall_data = redis_client.execute_command('HGETALL', redis_key)
+
+    print(fall_data)
+    # The fall_data consists of a list of key-value pairs, but in bytes format
+    # We need to convert it to string format
+    # fall_data = {fall_data[i].decode('utf-8'): fall_data[i+1].decode('utf-8') for i in range(0, len(fall_data), 2)}
+
+    hours = list(range(24))
+    values = [int(fall_data.get(str(hour).encode('utf-8'), 0)) for hour in hours]
+
+    # Print values in hours and values for testing
+    print("Hours:", hours)
+    print("Values:", values)
+
+    matplotlib.pyplot.figure(figsize=(10, 5))
+    matplotlib.pyplot.plot(hours, values, marker='o')
+    matplotlib.pyplot.xlabel('Hour')
+    matplotlib.pyplot.ylabel('Number of Falls')
+    matplotlib.pyplot.title(f'Falls on {date}')
+    matplotlib.pyplot.grid(True)
 
     chart_path = 'static/detection_chart.png'
-    matplotlib.pyplot .savefig(chart_path)
-    matplotlib.pyplot .close()
+    matplotlib.pyplot.savefig(chart_path)
+    matplotlib.pyplot.close()
 
-    # 绘制完成，清空 results
-    results.clear()
-    return send_file(chart_path, mimetype='image/png')
+    # 绘制完成，返回结果，不允许缓存
+    return send_file(chart_path, mimetype='image/png', max_age=0)
 
 def get_sorted_files():
     files = []
@@ -225,6 +259,7 @@ def pause_observation():
     return jsonify({"status": "paused", "message": "observation is now suspended"})
 
 if __name__ == '__main__':
+    init_redis()
     Thread(target=start_observer).start()
 
     observer_event.set()
