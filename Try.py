@@ -22,7 +22,7 @@ app = Flask(__name__)
 
 # No need for a global results array
 # results = []
-matplotlib.use('Agg')  # 添加这一行以使用非交互式后端
+matplotlib.use('Agg')  # Use the 'Agg' backend for non-interactive mode
 
 # 设置要监控的目录
 WATCH_DIRECTORY = os.path.expanduser("~/FYPfiles/venv/files")
@@ -44,8 +44,9 @@ redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
 
 # Initialize the Redis configuration, reset corresponding data
 def init_redis():
-    # Flush the database
-    redis_client.flushdb()
+    # Don't Flush the database，this will destroy the RDB persistant sotrage
+    # redis_client.flushdb()
+    return
 
 # 创建一个自定义事件处理器
 # 个人认为本项目的处理流程并不需要用到 on_changed 方法，不过还是写入进来以防万一
@@ -88,7 +89,7 @@ class MyHandler(FileSystemEventHandler):
                     # No need to do extra useless work if is_fall == 0
                     if is_fall == 1:
                         redis_key = f"fall_data:{date}"
-                        redis_client.hincrby(redis_key, time.hour, 1)
+                        redis_client.hincrby(redis_key, (2*time.hour+1)/2, 1)
 
     def on_changed(self, event):
         if not event.is_directory:
@@ -203,25 +204,36 @@ def get_detection_chart():
     # fall_data = {fall_data[i].decode('utf-8'): fall_data[i+1].decode('utf-8') for i in range(0, len(fall_data), 2)}
 
     hours = list(range(24))
-    values = [int(fall_data.get(str(hour).encode('utf-8'), 0)) for hour in hours]
+    # add 0.5 to each element of hours
+    pts = [i+0.5 for i in range(24)]
+    values = [int(fall_data.get(str(pt).encode('utf-8'), 0)) for pt in pts]
 
     # Print values in hours and values for testing
     print("Hours:", hours)
     print("Values:", values)
 
     matplotlib.pyplot.figure(figsize=(10, 5))
-    matplotlib.pyplot.plot(hours, values, marker='o')
+    matplotlib.pyplot.bar(pts, values)
     matplotlib.pyplot.xlabel('Hour')
     matplotlib.pyplot.ylabel('Number of Falls')
     matplotlib.pyplot.title(f'Falls on {date}')
     matplotlib.pyplot.grid(True)
+    matplotlib.pyplot.xticks(hours)
+    
+    max_value = max(values) if values else 0
+    matplotlib.pyplot.yticks(range(0, max_value+1))
 
     chart_path = 'static/detection_chart.png'
     matplotlib.pyplot.savefig(chart_path)
     matplotlib.pyplot.close()
 
+    @copy_current_request_context
+    def send_file_async(file_path, mime_type):
+        return send_file(file_path, mimetype=mime_type, conditional=True)
+
     # 绘制完成，返回结果，不允许缓存
-    return send_file(chart_path, mimetype='image/png', max_age=0)
+    return send_file_async(chart_path, 'image/png')
+    # return send_file(chart_path, mimetype='image/png', max_age=0)
 
 def get_sorted_files():
     files = []
