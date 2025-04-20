@@ -55,7 +55,7 @@ sudo redis-server ./redis.conf
 - 这里推荐一款很好用的 Redis GUI 软件：Medis（仅限 Mac 端用户），这个应用提供了傻瓜式一键管理 Redis 数据库的界面
 3. 运行 Flask 应用：
 ```bash
-python Try.py # 如果你用的是 不同的 python 解释器，这里请切换成自己解释器的名字
+python Server.py # 如果你用的是 不同的 python 解释器，这里请切换成自己解释器的名字
 ```
 - 或者用 VScode 自带的 python 解释器运行
 4. 在本机浏览器中打开 http://localhost:5000 即可访问 web 界面。

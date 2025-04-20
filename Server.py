@@ -203,13 +203,13 @@ def get_detection_chart():
     # We need to convert it to string format
     # fall_data = {fall_data[i].decode('utf-8'): fall_data[i+1].decode('utf-8') for i in range(0, len(fall_data), 2)}
 
-    hours = list(range(24))
+    # hours = list(range(24))
     # add 0.5 to each element of hours
     pts = [i+0.5 for i in range(24)]
     values = [int(fall_data.get(str(pt).encode('utf-8'), 0)) for pt in pts]
 
     # Print values in hours and values for testing
-    print("Hours:", hours)
+    print("Hours:", pts)
     print("Values:", values)
 
     matplotlib.pyplot.figure(figsize=(10, 5))
@@ -218,7 +218,7 @@ def get_detection_chart():
     matplotlib.pyplot.ylabel('Number of Falls')
     matplotlib.pyplot.title(f'Falls on {date}')
     matplotlib.pyplot.grid(True)
-    matplotlib.pyplot.xticks(hours)
+    matplotlib.pyplot.xticks(range(25))
     
     max_value = max(values) if values else 0
     matplotlib.pyplot.yticks(range(0, max_value+1))
