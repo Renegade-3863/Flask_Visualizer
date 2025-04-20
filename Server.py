@@ -1,3 +1,4 @@
+# Declaration: Part of the jsonify codes are generated using Trae AI supporter
 import time
 import os
 from datetime import datetime
@@ -24,19 +25,20 @@ app = Flask(__name__)
 # results = []
 matplotlib.use('Agg')  # Use the 'Agg' backend for non-interactive mode
 
-# 设置要监控的目录
+# Set the monitering directory
 WATCH_DIRECTORY = os.path.expanduser("~/FYPfiles/venv/files")
 app.config['UPLOAD_FOLDER'] = WATCH_DIRECTORY
 
-# 存储检测到的文件
+# Save detected files
 detected_files = []
 
-# 创建一个事件对象来控制观察者
+# Event used to manipulate the observer
 observer_event = Event()
 
-# 创建一个全局变量来跟踪检测状态
+# Global var used to track the detecion status
 detection_active = True
 
+# Thread pool used to do asynchronized data transmission
 executor = ThreadPoolExecutor(max_workers=8)
 
 # Handle redis connection, use the default localhost and port for testing
@@ -48,8 +50,8 @@ def init_redis():
     # redis_client.flushdb()
     return
 
-# 创建一个自定义事件处理器
-# 个人认为本项目的处理流程并不需要用到 on_changed 方法，不过还是写入进来以防万一
+# Customized event handler
+# on_changed function might not be necessary, but is still added for possible secondary development
 class MyHandler(FileSystemEventHandler):
     def on_created(self, event):
         if not event.is_directory:
@@ -66,7 +68,7 @@ class MyHandler(FileSystemEventHandler):
                 }
                 if new_file not in detected_files:
                     detected_files.append(new_file)
-                    # 检测到新文件后暂停观察者
+                    # Pause the observer when new files detected
                     observer_event.clear()
                     global detection_active
                     detection_active = False
@@ -106,19 +108,23 @@ class MyHandler(FileSystemEventHandler):
                 }
                 if new_file not in detected_files:
                     detected_files.append(new_file)
-                    # 检测到新文件后暂停观察者
+                    # Pause the observer when new files detected
                     observer_event.clear()
+                    # Declare the global variable, like extern key word in C/C++
                     global detection_active
                     detection_active = False
 
 
-# 创建观察者并启动
+# Create, initialize and start the observer
 def start_observer():
     observer = Observer()
     event_handler = MyHandler()
     observer.schedule(event_handler, path=WATCH_DIRECTORY, recursive=False)
     observer.start()
 
+    # Event loop
+    # Always looping the observer if is set
+    # Stops when the observer is stopped by keyboard interrupt
     try:
         while True:
             if observer_event.is_set():
@@ -130,33 +136,36 @@ def start_observer():
 
     observer.join()
 
-# Flask 路由
+# Flask root router
 @app.route('/')
 def index():
+    # Render the detected files using render_template
     return render_template('index.html', files=detected_files)
 
 @app.route('/uploads/<path:filename>')
 def download_file(filename):
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     
-    # 获取文件的 MIME 类型
+    # Acquire the MIME types of the files, although we currently only support .mp4 files
     mime_type, _ = mimetypes.guess_type(file_path)
 
+    # @copy_current_request_context modifier used to acquire the current request contexts
+    # They are used for data transmission in the spread executor (thread)
     @copy_current_request_context
     def send_file_async(file_path, mime_type):
         return send_file(file_path, mimetype=mime_type, conditional=True)
     
-    # 如果是视频文件，使用 send_file 并支持范围请求
     if mime_type and mime_type.startswith('video'):
         future = executor.submit(send_file_async, file_path, mime_type)
         return future.result()
         # return send_file(file_path, mimetype=mime_type, conditional=True)
     
-    # 对于其他文件类型，使用 send_file
+    # Not used now, possibly for later secondary development
     future = executor.submit(send_file_async, file_path, None)
     return future.result()
     # return send_file(file_path, conditional=True)
 
+# Only to make the compiler happy, supress those annoying warnings
 @app.route('/favicon.ico')
 def favicon():
     return '', 200
@@ -231,7 +240,7 @@ def get_detection_chart():
     def send_file_async(file_path, mime_type):
         return send_file(file_path, mimetype=mime_type, conditional=True)
 
-    # 绘制完成，返回结果，不允许缓存
+    # return the plot generated
     return send_file_async(chart_path, 'image/png')
     # return send_file(chart_path, mimetype='image/png', max_age=0)
 
@@ -248,7 +257,7 @@ def get_sorted_files():
             "created_at": datetime.fromtimestamp(created_time).isoformat()
         })
     
-    # 按创建时间降序排序
+    # sort the files in descending order of the acquired time
     return sorted(files, key=lambda x: x['created_at'], reverse=True)
 
 @app.route('/delete_file', methods=['POST'])
