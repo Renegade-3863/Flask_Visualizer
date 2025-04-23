@@ -159,8 +159,11 @@
                         console.log("detection paused");
                         // play the alert sound
                         playAlertSound();
-                        // alert with the timestamp of current system time
-                        alert("New file detected on " + new Date().toLocaleString() + ", the automatic detection has been paused, press on continue detection to continue");
+                        // pause for a few seconds before showing the alert
+                        setTimeout(() => {
+                            // alert with the timestamp of current system time
+                            alert("New file detected on " + new Date().toLocaleString() + ", the automatic detection has been paused, press on continue detection to continue");
+                        }, 7000);
                         // update status of corresponding buttons
                         document.getElementById('pauseObservation').disabled = true;
                         document.getElementById('resumeDetection').disabled = false;
@@ -304,7 +307,7 @@
             document.getElementById('pauseObservation').disabled = false;
             document.getElementById('preview-container').style.display = 'none';
             document.getElementById('preview-content').innerHTML = '';
-        })
+        });
 
         checkNewFiles(); // main event loop of the whole page
     </script>
