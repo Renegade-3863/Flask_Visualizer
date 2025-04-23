@@ -1,3 +1,4 @@
+<!-- Declaration: Part of the layout design and css files are generated through Trae AI, parameters modified by the writer of the repo -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -52,6 +53,8 @@
 </head>
 <body>
     <h1>Fall Detection</h1>
+    <!-- Some basic components of the page, rendered by the .css file -->
+    <audio id="alrtSound" src="/static/alert.mp3" preload="auto"></audio>
     <div id="container">
         <div id="button-list">
             <button id="toggleLatestFile" style="display: block; margin-bottom: 20px;">close the latest file display</button>
@@ -64,11 +67,9 @@
         <div id="content">
             <div id="latest-file-display"></div>
             <ul id="fileList" class="file-list">
-                <!-- 文件列表将通过 JavaScript 动态更新 -->
             </ul>
         </div>
         <div id="chart-container" style="display: none;">
-            <!-- <button id="close-chart">Close Chart</button> -->
             <img id="detectionChart" style="display: block; margin-top: 20px;" />
         </div>
     </div>
@@ -78,9 +79,18 @@
         <div id="preview-content"></div>
     </div>
 
+    <!-- The processing functions in script domain -->
     <script>
         let checkingNewFiles = true;
 
+        function playAlertSound()
+        {
+            const alrtSound = document.getElementById('alrtSound');
+            alrtSound.play();
+        }
+
+        // Encapsulate a helper function for creating a file element, currently only for mp4 files
+        // Waiting for more files to be added if there are needs
         function createFileElement(file, isLatest = false) {
             const li = document.createElement('li');
             li.className = 'file-item';
@@ -116,7 +126,62 @@
 
             return li;
         }
+        // helper function for updating the file list to be visualized
+        function updateFileList(files) {
+            const fileList = document.getElementById('fileList');
+            const latestFileContainer = document.getElementById('latest-file-display');
+            fileList.innerHTML = ''; 
+            latestFileContainer.innerHTML = ''; 
 
+            // sort the files in their creation time
+            files.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            files.forEach((file, index) => {
+                const fileElement = createFileElement(file);
+                fileList.appendChild(fileElement);
+
+                // update the newest file to be contained in the latest-file-container
+                if (index === 0) {
+                   latestFileContainer.appendChild(createFileElement(file, true));
+                }
+            });
+        }
+
+        // Main event: Checking new files within specified directory and do response when necessary 
+        function checkNewFiles() {
+            if (!checkingNewFiles) return;
+
+            axios.get('/get_new_files')
+                .then(response => {
+                    const data = response.data;
+                    if (data.status === "paused") {
+                        checkingNewFiles = false;
+                        console.log("detection paused");
+                        // play the alert sound
+                        playAlertSound();
+                        // alert with the timestamp of current system time
+                        alert("New file detected on " + new Date().toLocaleString() + ", the automatic detection has been paused, press on continue detection to continue");
+                        // update status of corresponding buttons
+                        document.getElementById('pauseObservation').disabled = true;
+                        document.getElementById('resumeDetection').disabled = false;
+                        document.getElementById('latest-file-display').style.display = 'block';
+                        document.getElementById('toggleLatestFile').textContent = 'close the latest file display';
+                        // update the file list
+                        updateFileList(data.files); 
+                    } else {
+                        // update the file list if there are no new files detected every 5 seconds
+                        updateFileList(data); 
+                        setTimeout(checkNewFiles, 5000);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching new files:', error);
+                    setTimeout(checkNewFiles, 5000);
+                });
+        }
+
+        /* Below are some basic logic of the buttons */
+        // The pause detection button trigger logic
         document.getElementById('pauseObservation').addEventListener('click', function() {
                 axios.post('/pause_observation')
                 .then(response => {
@@ -135,14 +200,14 @@
                 });
         });
 
+        // The get detection chart button trigger logic
         document.getElementById('getDetectionChart').addEventListener('click', function() {
             const date = document.getElementById('chartDate').value;
-            alert(date);
             if (!date) {
                 alert('Please select a date');
                 return;
             }
-            // alert('Selected date:', date);
+            alert("getting the conclusion figure for: "+ date);
             axios.get('/get_detection_chart', {params:{date: date}})
                 .then(response => {
                     const chart = document.getElementById('detectionChart');
@@ -157,62 +222,13 @@
                     alert('Failed to fetch detection chart');
                 });
         });
-
-        function updateFileList(files) {
-            const fileList = document.getElementById('fileList');
-            const latestFileContainer = document.getElementById('latest-file-display');
-            fileList.innerHTML = ''; // 清空现有列表
-            latestFileContainer.innerHTML = ''; // 清空最新文件显示
-
-            // 按照文件的创建时间降序排序（最新的文件在前）
-            files.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-            files.forEach((file, index) => {
-                const fileElement = createFileElement(file);
-                fileList.appendChild(fileElement);
-
-                // 将最新的文件放大显示
-                if (index === 0) {
-                    latestFileContainer.appendChild(createFileElement(file, true));
-                }
-            });
-        }
-
-        function checkNewFiles() {
-            if (!checkingNewFiles) return;
-
-            axios.get('/get_new_files')
-                .then(response => {
-                    const data = response.data;
-                    if (data.status === "paused") {
-                        checkingNewFiles = false;
-                        console.log("检测已暂停");
-                        // alert 添加当前时间戳
-
-                        alert("New file detected on " + new Date().toLocaleString() + ", the automatic detection has been paused, press on continue detection to continue");
-                        document.getElementById('pauseObservation').disabled = true;
-                        document.getElementById('resumeDetection').disabled = false;
-                        // 显示最新文件
-                        document.getElementById('latest-file-display').style.display = 'block';
-                        // 更新显示最新文件的按钮状态
-                        document.getElementById('toggleLatestFile').textContent = 'close the latest file display';
-                        updateFileList(data.files); // 更新文件列表
-                    } else {
-                        updateFileList(data); // 更新文件列表
-                        setTimeout(checkNewFiles, 5000);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching new files:', error);
-                    setTimeout(checkNewFiles, 5000);
-                });
-        }
         
         document.getElementById('close-preview').addEventListener('click', function() {
             document.getElementById('preview-container').style.display = 'none';
             document.getElementById('preview-content').innerHTML = '';
         });
 
+        // The resume detection button trigger logic
         document.getElementById('resumeDetection').addEventListener('click', function() {
             axios.get('/resume_detection')
                 .then(response => {
@@ -222,7 +238,7 @@
                         alert("detection restored, the system will continue to monitor new files");
                         checkingNewFiles = true;
                         checkNewFiles();
-                        // 更新 UI
+                        // update the status of the corresponding buttons
                         document.getElementById('pauseObservation').disabled = false;
                         document.getElementById('resumeDetection').disabled = true;
                     }
@@ -233,6 +249,7 @@
                 });
         });
 
+        // The delete file button trigger logic
         document.getElementById('fileList').addEventListener('click', function(e) {
             if (e.target.classList.contains('delete-file')) {
                 const li = e.target.closest('li');
@@ -242,6 +259,7 @@
                     .then(response => {
                         const data = response.data;
                         if (data.status === 'success') {
+                            // Don't forget to update the UI after the deletion in the OS
                             li.remove();
                             alert(data.message);
                         } else {
@@ -255,6 +273,7 @@
             }
         });
 
+        // The open/close latest file display button trigger logic
         document.getElementById('toggleLatestFile').addEventListener('click', function() {
             const latestFileContainer = document.getElementById('latest-file-display');
             if (latestFileContainer.style.display === 'none') {
@@ -266,6 +285,7 @@
             }
         });
 
+        // The show/hide detection chart button trigger logic
         document.getElementById('toggleChart').addEventListener('click', function() {
         const chartContainer = document.getElementById('chart-container');
             if (chartContainer.style.display === 'none') {
@@ -277,6 +297,8 @@
             }
         });
 
+        // Keep the buttons logic consistent with the initial state of the page
+        // Only show the contents when the DOM tree are fully loaded and prepared
         document.addEventListener("DOMContentLoaded", function() {
             document.getElementById('resumeDetection').disabled = true;
             document.getElementById('pauseObservation').disabled = false;
@@ -284,7 +306,7 @@
             document.getElementById('preview-content').innerHTML = '';
         })
 
-        checkNewFiles(); // 开始检查新文件
+        checkNewFiles(); // main event loop of the whole page
     </script>
 </body>
 </html>

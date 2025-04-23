@@ -71,6 +71,13 @@ class MyHandler(FileSystemEventHandler):
                     # Pause the observer when new files detected
                     observer_event.clear()
                     global detection_active
+                    # Check whether SAFE is included in the file name
+                    fall_str = file_name.split('_')[0]
+                    if fall_str == 'SAFE':
+                        # If SAFE is included, no need to pause the detection or do any other things, we ignore it
+                        print("SAFE detected")
+                        return
+
                     detection_active = False
 
                     date_str = file_name.split('_')[1]
@@ -217,9 +224,9 @@ def get_detection_chart():
     pts = [i+0.5 for i in range(24)]
     values = [int(fall_data.get(str(pt).encode('utf-8'), 0)) for pt in pts]
 
-    # Print values in hours and values for testing
-    print("Hours:", pts)
-    print("Values:", values)
+    # Print values in hours and values for testing (uncomment only for testing)
+    # print("Hours:", pts)
+    # print("Values:", values)
 
     matplotlib.pyplot.figure(figsize=(10, 5))
     matplotlib.pyplot.bar(pts, values)
