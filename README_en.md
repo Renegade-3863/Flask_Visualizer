@@ -71,3 +71,8 @@ time = datetime.strptime(time_str, '%H:%M:%S').time()
 ```
 
 - The falling count in hour will be recorded in <key, value> pair in the Redis database. Visualization buttons are provided on the webpage.
+
+# TO DO:
+- <u>Remember to delete the appendonlydir file in the source directory to avoid redis initialiation failure.</u>
+- Remember to interact first with the webpage before actually running the AI model for generating results.
+
