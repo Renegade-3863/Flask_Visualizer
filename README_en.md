@@ -37,7 +37,7 @@ brew instal redis  # On Mac
 ```
 or
 ``` bash
-apt install redis  # On Windows
+apt install redis  # On Linux
 ```
 
 ## Usage
