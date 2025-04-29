@@ -4,6 +4,7 @@
 <head>
     <!-- introduce the axios library, used for doing http request-->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <link rel="stylesheet" type="text/css" href="/static/styles.css"> <!-- using css as the render of the webpage -->
     <style>
     #container {
@@ -81,6 +82,31 @@
 
     <!-- The processing functions in script domain -->
     <script>
+        const socket = io('http://127.0.0.1:5000');
+
+        socket.on('update_chart', function(data) {
+            const date = data.date;
+            updateDetectionChart(date);
+            console.log("Updating Chart!!!!");
+        });
+
+        // Callback when update_chart event is triggered
+        function updateDetectionChart(date) 
+        {
+            axios.get('/get_detection_chart', {params:{date: date}})
+            .then(response => {
+                const chart = document.getElementById('detectionChart');
+                const timestamp = new Date().getTime();
+                chart.src = '/static/detection_chart.png?t=' + timestamp;
+                chart.style.display = 'block';
+                document.getElementById('chart-container').style.display = 'block';
+                document.getElementById('toggleChart').textContent = 'Hide Detection Chart';
+            })
+            .catch(error => {
+                console.error('Error fetching detection chart:', error);
+                alert('Failed to fetch detection chart');
+            });
+        }
         let checkingNewFiles = true;
 
         function playAlertSound()
@@ -162,7 +188,7 @@
                         // pause for a few seconds before showing the alert
                         setTimeout(() => {
                             // alert with the timestamp of current system time
-                            alert("New file detected on " + new Date().toLocaleString() + ", the automatic detection has been paused, press on continue detection to continue");
+                            alert("Fall detected on " + new Date().toLocaleString() + ", the automatic detection has been paused, press on continue detection to continue");
                         }, 7000);
                         // update status of corresponding buttons
                         document.getElementById('pauseObservation').disabled = true;

@@ -18,8 +18,14 @@ import matplotlib.pyplot
 from concurrent.futures import ThreadPoolExecutor
 # Use Redis to store the average high frequency falling time interval 
 import redis
+from flask_socketio import SocketIO
 
 app = Flask(__name__)
+socketio = SocketIO(app)
+
+pts = [i+0.5 for i in range(24)]
+values = [0] * 24
+current_chart_date = 'NULL'
 
 # No need for a global results array
 # results = []
@@ -84,7 +90,7 @@ class MyHandler(FileSystemEventHandler):
                     time_str = file_name.split('_')[2]
                     # Need to remove the .mp4 suffix
                     time_str = time_str.replace('.mp4', '')
-                    date = datetime.strptime(date_str, '%Y:%m:%d').date()
+                    date = datetime.strptime(date_str, '%Y-%m-%d').date()
                     time = datetime.strptime(time_str, '%H:%M:%S').time()
 
                     # For testing purpose
@@ -99,6 +105,37 @@ class MyHandler(FileSystemEventHandler):
                     if is_fall == 1:
                         redis_key = f"fall_data:{date}"
                         redis_client.hincrby(redis_key, (2*time.hour+1)/2, 1)
+                    # re-plot the figure, then notify the front-end to modify the display
+                    global pts
+                    global values
+                    matplotlib.pyplot.figure(figsize=(10, 5))
+                    matplotlib.pyplot.bar(pts, values)
+                    matplotlib.pyplot.xlabel('Hour')
+                    matplotlib.pyplot.ylabel('Number of Falls')
+                    matplotlib.pyplot.title(f'Falls on {date}')
+                    matplotlib.pyplot.grid(True)
+                    matplotlib.pyplot.xticks(range(25))
+    
+                    max_value = max(values) if values else 0
+                    matplotlib.pyplot.yticks(range(0, max_value+1))
+
+                    chart_path = 'static/detection_chart.png'
+                    matplotlib.pyplot.savefig(chart_path)
+                    matplotlib.pyplot.close()
+                    # Notify the front-end if the date matches
+                    print("Matching: ")
+                    print(date_str)
+                    print(", ")
+                    print(current_chart_date)
+                    
+                    print(date_str.strip() == current_chart_date.strip())
+
+                    print("date_str:", date_str, "Length:", len(date_str), "ASCII:", [ord(c) for c in date_str])
+                    print("current_chart_date:", current_chart_date, "Length:", len(current_chart_date), "ASCII:", [ord(c) for c in current_chart_date])
+                    if date_str.strip() == current_chart_date.strip():
+                        print("Notifying the socket!")
+                        socketio.emit('update_chart', {'date': date.strftime('%Y-%m-%d')})
+
 
     def on_changed(self, event):
         if not event.is_directory:
@@ -141,7 +178,7 @@ def start_observer():
     except KeyboardInterrupt:
         observer.stop()
 
-    observer.join()
+    observer.join()         
 
 # Flask root router
 @app.route('/')
@@ -221,8 +258,12 @@ def get_detection_chart():
 
     # hours = list(range(24))
     # add 0.5 to each element of hours
+    global pts
+    global values
+    global current_chart_date
     pts = [i+0.5 for i in range(24)]
     values = [int(fall_data.get(str(pt).encode('utf-8'), 0)) for pt in pts]
+    current_chart_date = date_str
 
     # Print values in hours and values for testing (uncomment only for testing)
     # print("Hours:", pts)
@@ -293,3 +334,4 @@ if __name__ == '__main__':
     observer_event.set()
 
     app.run(debug=True, use_reloader=False)
+    # socketio.run(app, port=8000, debug=False, use_reloader=False)
