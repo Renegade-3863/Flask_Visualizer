@@ -83,6 +83,8 @@
     <!-- The processing functions in script domain -->
     <script>
         const socket = io('http://127.0.0.1:5000');
+        // Mark used to mark the first initialization of the file list
+        isFirst = true;
 
         socket.on('update_chart', function(data) {
             const date = data.date;
@@ -198,8 +200,13 @@
                         // update the file list
                         updateFileList(data.files); 
                     } else {
-                        // update the file list if there are no new files detected every 5 seconds
-                        updateFileList(data); 
+                        // Don't update the file list if there are no new files detected every 5 seconds, or the file list is empty
+                        if(isFirst)
+                        {
+                            console.log("first time");
+                            updateFileList(data); 
+                            isFirst = false;
+                        }
                         setTimeout(checkNewFiles, 5000);
                     }
                 })
