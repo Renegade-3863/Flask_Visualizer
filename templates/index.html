@@ -178,7 +178,7 @@
         // Main event: Checking new files within specified directory and do response when necessary 
         function checkNewFiles() {
             if (!checkingNewFiles) return;
-
+            console.log("checking new files")
             axios.get('/get_new_files')
                 .then(response => {
                     const data = response.data;
@@ -278,6 +278,8 @@
                         // update the status of the corresponding buttons
                         document.getElementById('pauseObservation').disabled = false;
                         document.getElementById('resumeDetection').disabled = true;
+                        // Then continue the detection
+                        checkNewFiles();
                     }
                 })
                 .catch(error => {
