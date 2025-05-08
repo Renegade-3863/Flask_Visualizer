@@ -84,7 +84,7 @@
     <script>
         const socket = io('http://127.0.0.1:5000');
         // Mark used to mark the first initialization of the file list
-        isFirst = true;
+        let isFirst = true;
 
         socket.on('update_chart', function(data) {
             const date = data.date;
@@ -273,7 +273,8 @@
                         console.log("detection restored");
                         alert("detection restored, the system will continue to monitor new files");
                         checkingNewFiles = true;
-                        checkNewFiles();
+                        // update the file list for possible missing of files
+                        updateFileList(data.files);
                         // update the status of the corresponding buttons
                         document.getElementById('pauseObservation').disabled = false;
                         document.getElementById('resumeDetection').disabled = true;
@@ -301,6 +302,20 @@
                         } else {
                             alert('deletion failed:' + data.message);
                         }
+                        // Don't forget to update the file list after the deletion
+                        const latestFileContainer = document.getElementById('latest-file-display');
+                        latestFileContainer.innerHTML = ''; 
+                        const files = data.files;
+                        files.forEach((file, index) => {
+                            const fileElement = createFileElement(file);
+                            fileList.appendChild(fileElement);
+
+                            // update the newest file to be contained in the latest-file-container
+                            if (index === 0) {
+                            latestFileContainer.appendChild(createFileElement(file, true));
+                        }
+                    })
+
                     })
                     .catch(error => {
                         console.error('Error deleting file:', error);

@@ -130,8 +130,8 @@ class MyHandler(FileSystemEventHandler):
                     
                     print(date_str.strip() == current_chart_date.strip())
 
-                    print("date_str:", date_str, "Length:", len(date_str), "ASCII:", [ord(c) for c in date_str])
-                    print("current_chart_date:", current_chart_date, "Length:", len(current_chart_date), "ASCII:", [ord(c) for c in current_chart_date])
+                    # print("date_str:", date_str, "Length:", len(date_str), "ASCII:", [ord(c) for c in date_str])
+                    # print("current_chart_date:", current_chart_date, "Length:", len(current_chart_date), "ASCII:", [ord(c) for c in current_chart_date])
                     if date_str.strip() == current_chart_date.strip():
                         print("Notifying the socket!")
                         socketio.emit('update_chart', {'date': date.strftime('%Y-%m-%d')})
@@ -219,7 +219,7 @@ def resume_detection():
     global detection_active
     observer_event.set()
     detection_active = True
-    return jsonify({"status": "resumed"})
+    return jsonify({"status": "resumed", "files": get_sorted_files()})
 
 @app.route('/get_new_files')
 def get_new_files():
@@ -317,7 +317,7 @@ def delete_file():
             os.remove(full_path)
             global detected_files
             detected_files = [f for f in detected_files if f['path'] != file_path]
-            return jsonify({"status": "success", "message": "file deleted"})
+            return jsonify({"status": "success", "message": "file deleted", "files": get_sorted_files()})
     return jsonify({"status": "error", "message": "file deletion failed"}), 400
 
 @app.route('/pause_observation', methods=['POST'])
